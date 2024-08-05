@@ -1,0 +1,348 @@
+---
+title: "Vektor Error Correction Model (VECM)"
+author: "Wisnu Sevatiyan Diqrelah"
+date: "2022-12-12"
+output:
+  pdf_document: default
+  word_document: default
+  html_document:
+    df_print: paged
+---
+Import Library :
+
+```{r}
+library(vars)
+library(mFilter)
+library(tseries)
+library(TSstudio)
+library(forecast)
+library(tidyverse)
+library(readxl)
+library(tsDyn)
+library(urca)
+```
+
+Membuka File data dan menamai variabel :
+
+```{r}
+df = read_excel("F:\\SEMESTER 5\\ramalan\\VAR\\DATA.xlsx")
+head(df)
+```
+
+
+
+```{r}
+ekspor <- ts(df$`Nilai Ekspor`, start = c(2000,1,1), frequency = 12)
+impor <- ts(df$`Nilai Impor`, start = c(2000,1,1), frequency = 12)
+```
+
+Time Series Plot :
+
+```{r}
+ts_plot(ekspor)
+ts_plot(impor)
+```
+
+Uji Kestasioneran Data :
+
+- ADF test (H0: series has unit root)
+- PP test (H0: series has unit root)
+- KPSS test (H0: series has no unit root)
+
+```{r}
+adf.test(ekspor)
+adf.test(impor)
+```
+
+```{r}
+pp.test(ekspor)
+pp.test(impor)
+```
+
+```{r}
+kpss.test(impor)
+kpss.test(ekspor)
+```
+
+Melakukan differencing pada data dan melakukan uji stasioner lagi :
+
+```{r}
+ekspor = diff(ekspor)
+impor = diff(impor)
+pp.test(ekspor)
+pp.test(impor)
+```
+
+```{r}
+kpss.test(impor)
+kpss.test(ekspor)
+```
+
+```{r}
+adf.test(impor)
+adf.test(ekspor)
+```
+
+
+```{r}
+vl <- cbind(ekspor, impor)
+colnames(vl) <- cbind("Ekspor", "Impor")
+```
+
+Mencari nilai Lag terbaik dan melakukan estimasi model VAR :
+
+```{r}
+lagselect <- VARselect(vl, lag.max = 15, type = "const")
+lagselect$selection
+```
+
+Model dengan 1 lag :
+
+```{r}
+model_1 <- VAR(vl, p = 1, type = "both", season = NULL, exog = NULL)
+summary(model_1)
+plot(model_1, names = "MODEL 1")
+```
+
+Model dengan 2 lag :
+```{r}
+model_2 <- VAR(vl, p = 2, type = "both", season = NULL, exog = NULL)
+summary(model_2)
+plot(model_2, names = "MODEL 2")
+```
+
+Model dengan 3 lag :
+```{r}
+model_3 <- VAR(vl, p = 3, type = "both", season = NULL, exog = NULL)
+summary(model_3)
+plot(model_1, names = "MODEL 3")
+```
+
+Uji Autokorelasi atau white-noise dengan Portmanteau Test :
+
+```{r}
+serial_1 <- serial.test(model_1, lags.pt = 5, type = "PT.asymptotic")
+serial_2 <- serial.test(model_2, lags.pt = 5, type = "PT.asymptotic")
+serial_3 <- serial.test(model_3, lags.pt = 5, type = "PT.asymptotic")
+serial_1
+serial_2
+serial_3
+```
+
+Uji Heteroscedasticity dengan Arch Test :
+
+```{r}
+arch_1 <- arch.test(model_1, lags.multi = 3, multivariate.only = TRUE,)
+arch_2 <- arch.test(model_2, lags.multi = 3, multivariate.only = TRUE)
+arch_3 <- arch.test(model_3, lags.multi = 3, multivariate.only = TRUE)
+
+arch_1
+arch_2
+arch_3
+```
+
+Uji Normalitas :
+
+```{r}
+norm_1 <- normality.test(model_1, multivariate.only = TRUE)
+
+norm_1
+```
+
+```{r}
+norm_2 <- normality.test(model_2, multivariate.only = TRUE)
+
+norm_2
+```
+
+```{r}
+norm_3 <- normality.test(model_3, multivariate.only = TRUE)
+
+norm_3
+```
+
+Melihat kestabilan dari setiap model :
+
+```{r}
+stability_1 <- stability(model_1, type = "Rec-CUSUM")
+
+plot(stability_1)
+```
+
+```{r}
+stability_2 <- stability(model_2, type = "Rec-CUSUM")
+
+plot(stability_2)
+```
+
+```{r}
+stability_3 <- stability(model_3, type = "Rec-CUSUM")
+
+plot(stability_3)
+```
+
+Uji Granger Causality pada model 1 :
+
+```{r}
+granger_ekspor1 <- causality(model_1, cause = "Ekspor")
+
+granger_ekspor1
+```
+
+```{r}
+granger_impor1 <- causality(model_1, cause = "Impor")
+
+granger_impor1
+```
+
+Uji Granger Causality pada model 2 :
+
+```{r}
+granger_ekspor2 <- causality(model_2, cause = "Ekspor")
+
+granger_ekspor2
+```
+
+```{r}
+granger_impor2 <- causality(model_2, cause = "Impor")
+
+granger_impor2
+```
+
+Uji Granger Causality pada model 3 :
+
+```{r}
+granger_ekspor3 <- causality(model_3, cause = "Ekspor")
+
+granger_ekspor3
+```
+
+```{r}
+granger_impor3 <- causality(model_3, cause = "Impor")
+
+granger_impor3
+```
+
+Melihat fungsi responns implus dari volume ekspor dan impor :
+
+```{r}
+eksporirf <- irf(model_1, impulse = "Ekspor", response = "Ekspor")
+plot(eksporirf, ylab = "Ekspor", response = "Ekspor's shock to Ekspor", boot=T)
+
+eksporirf_2 <- irf(model_1, impulse = "Ekspor", response = "Impor")
+plot(eksporirf_2, ylab = "Ekspor", response = "Ekspor's shock to Impor", boot=T)
+
+imporirf <- irf(model_1, impulse = "Impor", response = "Impor")
+plot(imporirf, ylab = "Impor", response = "Impor's shock to Impor", boot=T)
+
+imporirf <- irf(model_1, impulse = "Impor", response = "Ekspor")
+plot(imporirf, ylab = "Impor", response = "Impor's shock to Ekspor", boot=T)
+```
+
+Melihat Forecast Error Variance Decomposition (FEVD) dari ketiga model  (model yang digunakan) dengan menampilkan 12 nilai teratas :
+
+Model 1 :
+
+```{r}
+fevd_1 <- fevd(model_1, n.ahead = 12)
+fevd_1
+plot(fevd_1)
+```
+
+Model 2 :
+
+```{r}
+fevd_2 <- fevd(model_2, n.ahead = 12)
+fevd_2
+plot(fevd_2)
+```
+Model 3 :
+
+```{r}
+fevd_3 <- fevd(model_3, n.ahead = 12)
+fevd_3
+plot(fevd_3)
+```
+
+Melakukan Peramalan menggunakan Vektor AutoRegressive (VAR) dengan meramalkan volume ekspor dan impor 12 tahun kedepan dengan nilai alfa 5% :
+
+Model 1 :
+
+```{r}
+ramalan_1 <- predict(model_1, n.ahead = 12, ci = 0.95)
+ramalan_1
+```
+Model 2 :
+
+```{r}
+ramalan_2 <- predict(model_2, n.ahead = 12, ci = 0.95)
+ramalan_2
+```
+
+Model 3 :
+
+```{r}
+ramalan_3 <- predict(model_3, n.ahead = 12, ci = 0.95)
+ramalan_3
+```
+
+
+Fanchart peramalan yang sudah dilakukan dari model yang digunakan :
+
+```{r}
+fanchart(ramalan_1, names = "Ekspor", main = "Fanchart for Ekspor Model 1", xlab = "Tahun", ylab = "Volume Ekspor")
+
+fanchart(ramalan_1, names = "Impor", main = "Fanchart for Impor Model 1", xlab = "Tahun", ylab = "Volume Impor")
+```
+
+```{r}
+fanchart(ramalan_2, names = "Ekspor", main = "Fanchart for Ekspor Model 2", xlab = "Tahun", ylab = "Volume Ekspor")
+
+fanchart(ramalan_2, names = "Impor", main = "Fanchart for Impor Model 2", xlab = "Tahun", ylab = "Volume Impor")
+```
+
+```{r}
+fanchart(ramalan_3, names = "Ekspor", main = "Fanchart for Ekspor Model 3", xlab = "Tahun", ylab = "Volume Ekspor")
+
+fanchart(ramalan_3, names = "Impor", main = "Fanchart for Impor Model 3", xlab = "Tahun", ylab = "Volume Impor")
+```
+
+Eigen Test :
+
+```{r}
+coin <- ca.jo(df[1:2], type = "eigen", K = 3, ecdet = "none", spec = "transitory")
+summary(coin)
+
+```
+
+Trace Test :
+
+```{r}
+coin <- ca.jo(df[1:2], type = "trace", K = 3, ecdet = "none", spec = "transitory")
+summary(coin)
+```
+
+```{r}
+s = 1*df$`Nilai Ekspor`-3.795804*df$`Nilai Impor`
+plot(s, type = "l")
+```
+
+Vector Error Correction Model (VECM):
+
+```{r}
+model_vecm <- VECM(df[1:2], lag = 3, r=1, estim = "ML")
+summary(model_vecm)
+```
+
+VAR representation of VECM :
+
+```{r}
+VARrep(model_vecm)
+```
+
+Melakukan peramalan/Forecasting nilai ekspor dan impor untuk 12 tahun ke depan :
+
+```{r}
+ramalan_vecm <-predict(model_vecm, n.ahead = 12)
+ramalan_vecm
+```
